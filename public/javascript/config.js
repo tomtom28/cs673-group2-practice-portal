@@ -1,0 +1,1 @@
+var UI_HELPER_API = "http://localhost:3000";

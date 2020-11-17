@@ -120,7 +120,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var endTime = arg.event.end;
         var doctorName = $("#select-doctor option:selected").text();
         var patientName = arg.event.title;
-        var appointmentType = arg.event.extendedProps.appointmentType;
+        var isTeleVisit = arg.event.extendedProps.isTeleVisit;
+        console.log(isTeleVisit)
 
         // Update Modal
         $("#bookedAptModal-label-apt-id").val(appointmentId);
@@ -128,7 +129,17 @@ document.addEventListener('DOMContentLoaded', function() {
         $("#bookedAptModal-label-date-end-time").val(endTime);
         $("#bookedAptModal-label-doctor-name").val(doctorName);
         $("#bookedAptModal-label-patient-name").val(patientName);
-        $("#bookedAptModal-label-apt-type").val(appointmentType);
+        if (isTeleVisit) {
+          $("#bookedAptModal-televisit").show(); // show button for tele visit
+          $("#bookedAptModal-label-apt-type").empty();
+          $("#bookedAptModal-label-apt-type").append('<option value="true">Tele-Visit</option>');
+        }
+        else {
+          $("#bookedAptModal-televisit").hide(); // hide button for tele visit
+          $("#bookedAptModal-label-apt-type").empty();
+          $("#bookedAptModal-label-apt-type").append('<option value="false">In-Person</option>');
+
+        }
 
         // Show modal
         $('#bookedAptModal').modal('show');
@@ -158,7 +169,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Show modal
         $('#cancelledAptModal').modal('show');
-
       }
 
       // Invalid Condition
@@ -167,16 +177,27 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(arg);
       }
 
-
-
     },
-
     dayMaxEvents: true, // allow "more" link when too many events
     events: [] // This gets set each time the calender mounts
+
   });
 
-
-  calendar.render();
+  // Create Doctor Selector
+  $.ajax({
+    type: "GET",
+    url: UI_HELPER_API + "/doctors",
+    data: {},
+    success: function(res) {
+      // Iterate over response and append to DOM
+      for (var i=0; i < res.length; i++) {
+        console.log(res[i])
+        $("#select-doctor").append('<option value="' + res[i].doctorId + '">' + res[i].doctorName + '</option>');
+      }
+      // Render Calendar
+      calendar.render();
+    }
+  });
 
 
   // Calendar Helper: Dr Name was Changed
@@ -192,8 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var endDay = calendar.view.getCurrentData().dateProfile.currentRange.end.getDate();
 
     // Call Helper Method to hit API and add all events to calendar within date range
-    // TODO - REPLACE WITH THE REAL "GetDoctorEventsByDateRange" METHOD
-    GetDoctorEventsByDateRange2(startMonth, startDay, endMonth, endDay, function(data) {
+    GetDoctorEventsByDateRange(startMonth, startDay, endMonth, endDay, function(data) {
       console.log(data)
       for (var _event of data) {
         calendar.addEvent(_event);
@@ -209,103 +229,93 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get Doctor Id
     var doctorId = $("#select-doctor").val();
 
-    // TODO add an AJAX call here
-    // GET params: doctorId, startMonth, startDate, endMonth, endDate
-    res = [
-      {
-        id: 1, // Appointment ID
-        title: 'Smith, John', // Patient Name
-        start: '2020-11-06T10:30:00',
-        end: '2020-11-06T12:30:00',
-        className: 'pp-calendar-booked',
-        extendedProps: {
-          patientId: 101,
-          doctorId: 201,
-          appointmentType: "Tele-Visit"
-        }
-      },
-      {
-        id: 2,
-        title: 'Available',
-        start: '2020-11-06T09:00:00',
-        end: '2020-11-06T10:00:00',
-        className: 'pp-calendar-open',
-      },
-      {
-        id: 3,
-        title: 'Available',
-        start: '2020-11-06T13:00:00',
-        end: '2020-11-06T14:00:00',
-        className: 'pp-calendar-open'
-      },
-      {
-        id: 4,
-        title: 'Adams, Jane',
-        start: '2020-11-06T15:00:00',
-        end: '2020-11-06T16:00:00',
-        className: 'pp-calendar-booked',
-        extendedProps: {
-          patientId: 101,
-          doctorId: 201,
-          appointmentType: "In-Person"
-        }
-      },
-      {
-        id: 5,
-        title: 'Cancellation',
-        start: '2020-11-06T16:30:00',
-        end: '2020-11-06T17:30:00',
-        className: 'pp-calendar-cancelled',
-        extendedProps: {
-          patientName: "Young, Angela",
-          cancelledById: 101,
-          cancelledByName: 'Young, Angela',
-          appointmentType: "In-Person"
-        }
-      }
-    ]
+    // Initialize response
+    var myResponse = [];
 
-    return _callback(res);
+    // First, get Open Timeslots
+    $.ajax({
+      type: "GET",
+      url: UI_HELPER_API + "/open",
+      data: {
+        "doctorId" : doctorId,
+        "startMonth" : startMonth,
+        "startDate" : startDate,
+        "endMonth" : endMonth,
+        "endDate" : endDate
+      },
+      success: function (res1) {
+        // Format and Append all Open Slots
+        var counter = 0;
+        for (var i=0; i<res1.length; i++) {
+          for (var j=0; j<res1[i].length; j++) {
+            var openSlot = {
+              id : counter,
+              title: res1[i][j].title,
+              start: res1[i][j].startDate + "T" + res1[i][j].startTime,
+              end: res1[i][j].endDate + "T" + res1[i][j].endTime,
+              className: 'pp-calendar-open'
+            };
+            myResponse.push(openSlot);
+            counter++;
+          }
+        }
+
+        // Second, get Booked Timeslots
+        $.ajax({
+          type: "GET",
+          url: UI_HELPER_API + "/booked",
+          data: {
+            "doctorId" : doctorId,
+            "startMonth" : startMonth,
+            "startDate" : startDate,
+            "endMonth" : endMonth,
+            "endDate" : endDate
+          },
+          success: function (res2) {
+            // Format and Append all Booked Slots
+            for (var i=0; i<res2.length; i++) {
+              for (var j=0; j<res2[i].length; j++) {
+                var bookedSlot = {
+                  id : counter,
+                  title: res2[i][j].title,
+                  start: res2[i][j].startDate + "T" + res2[i][j].startTime,
+                  end: res2[i][j].endDate + "T" + res2[i][j].endTime,
+                  className: 'pp-calendar-booked',
+                  extendedProps: {
+                    isTeleVisit: res2[i][j].isTeleVisit,
+                    patientId: res2[i][j].patientId,
+                    doctorId: res2[i][j].doctorId
+                  }
+                };
+                myResponse.push(bookedSlot);
+                counter++;
+              }
+            }
+
+            // TODO - Add another AJAX call for cancelled slots?
+            //   {
+            //     id: 5,
+            //     title: 'Cancellation',
+            //     start: '2020-11-06T16:30:00',
+            //     end: '2020-11-06T17:30:00',
+            //     className: 'pp-calendar-cancelled',
+            //     extendedProps: {
+            //       patientName: "Young, Angela",
+            //       cancelledById: 101,
+            //       cancelledByName: 'Young, Angela',
+            //       appointmentType: "In-Person"
+            //     }
+            //   }
+
+            console.log(myResponse);
+            return _callback(myResponse);
+
+          } // end success 2
+        }); // end AJAX call 2
+      } // end success 1
+    }); // end AJAX call 1
+
   }
-
-
-
-  // TODO REMOVE LATER ... ONLY TO TEST
-  // Calendar Helper: Call API for Date Range
-  function GetDoctorEventsByDateRange2(startMonth, startDate, endMonth, endDate,
-    _callback) {
-
-    // Get Doctor Id
-    var doctorId = $("#select-doctor").val();
-
-    // TODO add an AJAX call here
-    // GET params: doctorId, startMonth, startDate, endMonth, endDate
-    res = [
-      {
-        id: 6,
-        title: 'Moma, Joe',
-        start: '2020-11-07T10:30:00',
-        end: '2020-11-07T12:30:00',
-        className: 'pp-calendar-booked',
-        extendedProps: {
-          patientId: 401,
-          doctorId: 420,
-          appointmentType: "In-Person"
-        }
-      },
-      {
-        id: 7,
-        title: 'Available',
-        start: '2020-11-07T09:00:00',
-        end: '2020-11-07T10:00:00',
-        className: 'pp-calendar-open'
-      }
-    ]
-
-    return _callback(res);
-  }
-
-
 
   // Calendar Helper: Call API to update Doctor Availablity
   function UpdateDoctorAvailability(startMonth, startDay, startHour, startMinute,
@@ -432,6 +442,20 @@ document.addEventListener('DOMContentLoaded', function() {
       $("#openAptModal").modal('hide');
 
     return false;
+
+  });
+
+
+  // Modal Helper: Start TeleVist Session
+  $("#bookedAptModal-televisit").on('click', function() {
+
+    // Get Appointment and Doctor
+    var doctorId = $("#select-doctor").val();
+    var appointmentId = $("#bookedAptModal-label-apt-id").val();
+
+    // Redirect to TeleVisit
+    var newURL = window.location.origin + "/televisit?appointmentId=" + appointmentId + "&doctorId="+doctorId;
+    window.location.replace(newURL);
 
   });
 

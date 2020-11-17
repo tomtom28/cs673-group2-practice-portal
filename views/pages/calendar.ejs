@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <%- include('../partials/head'); %>
-    
+
     <!-- Link in Calendar -->
     <link rel="stylesheet" href='/vendor/fullcalendar-5.3.2/main.min.css'>
     <script src='/vendor/fullcalendar-5.3.2/main.min.js'></script>
@@ -24,11 +24,8 @@
     <div class="row toggle-doctor">
       <div class="col-6">
         <label for="select-doctor" class="calendar-menu-label">Doctor Name</label>
-        <!-- TODO - LIST OF DOCTOR NAMES in rails -->
         <select id="select-doctor" class="form-control" name="doctor">
-          <option value="docID1">Jasani, Shruti</option>
-          <option value="docID2">Smith, James</option>
-          <option value="docID3">Thompson, Tyson</option>
+          <!-- Dynamically Append options using Ajax on page load -->
         </select>
       </div>
     </div>
@@ -138,7 +135,8 @@
             <!-- Show Apt Type -->
             <div class="form-group">
               <label for="bookedAptModal-label-apt-type">Appointment Type</label>
-              <input type="text" class="form-control-file" id="bookedAptModal-label-apt-type" disabled>
+              <select class="form-control" id="bookedAptModal-label-apt-type" disabled>
+              </select>
             </div>
 
             <!-- Show Doctor Name -->
@@ -156,6 +154,7 @@
           </form>
         </div>
         <div class="modal-footer">
+          <button type="button" class="btn btn-success" id="bookedAptModal-televisit">TeleVisit</button>
           <button type="button" class="btn btn-danger" id="bookedAptModal-cancel-apt">Remove</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         </div>
