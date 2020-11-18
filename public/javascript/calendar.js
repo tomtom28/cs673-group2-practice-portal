@@ -187,11 +187,11 @@ document.addEventListener('DOMContentLoaded', function() {
   $.ajax({
     type: "GET",
     url: UI_HELPER_API + "/doctors",
-    headers: {
-      "Access-Control-Allow-Origin" : "*",
-      'Access-Control-Allow-Methods' : 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers' : 'Origin, Content-Type, X-Auth-Token'
-    },
+    // headers: {
+    //   "Access-Control-Allow-Origin" : "https://group2-practice-portal.herokuapp.com",
+    //   'Access-Control-Allow-Methods' : 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+    //   'Access-Control-Allow-Headers' : 'Origin, Content-Type, X-Auth-Token'
+    // },
     data: {},
     success: function(res) {
       // Iterate over response and append to DOM
