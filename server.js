@@ -57,7 +57,6 @@ app.get('/televisit', function(req, res) {
 
 // Get all Doctors
 app.get('/doctors', function(req, res) {
-  console.log("hit")
   let sampleDoctors = [
     {
       "doctorId" : 1,
@@ -70,6 +69,36 @@ app.get('/doctors', function(req, res) {
   ];
   res.json(sampleDoctors);
 });
+
+
+// Get all patients
+app.get('/patients', function(req, res) {
+  let samplePatients = [
+    {
+      "id" : 1,
+      "name" : "Monster, Cookie"
+    },
+    {
+      "id" : 201,
+      "name" : "Archer, Sterling"
+    },
+    {
+      "id" : 301,
+      "name" : "Brown, John"
+    },
+    {
+      "id" : 501,
+      "name" : "Jones, Mike"
+    },
+    {
+      "id" : 921,
+      "name" : "Wayne, Bruce"
+    }
+  ]
+
+  res.json(samplePatients);
+});
+
 
 // TeleVist Creation
 app.post("/televisit", function(req, res) {

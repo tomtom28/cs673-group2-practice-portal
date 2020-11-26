@@ -1,3 +1,6 @@
+var testDummy;
+
+
 document.addEventListener('DOMContentLoaded', function() {
 
   // Get Sunday of Today's Week
@@ -106,8 +109,25 @@ document.addEventListener('DOMContentLoaded', function() {
         $("#openAptModal-label-date-end-time").val(endTime);
         $("#openAptModal-label-doctor-name").val(doctorName);
 
-        // Show modal
-        $('#openAptModal').modal('show');
+
+        // AJAX Call to get all Patients in Practice
+        $.ajax({
+          type: "GET",
+          url: UI_HELPER_API + "/patients",
+          data: {},
+          success: function(res) {
+            // Append all Patients to the Dropdown menu
+            $("#openAptModal-label-patient-name").empty();
+            $("#openAptModal-label-patient-name").append("<option>Please select...</option>");
+            for (var i=0; i < res.length; i++) {
+              var patientHTML = '<option value="' + res[i].id + '">' + res[i].name + '</option>';
+              $("#openAptModal-label-patient-name").append(patientHTML);
+            }
+
+            // Show modal
+            $('#openAptModal').modal('show');
+          }
+        });
 
       }
 
