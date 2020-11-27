@@ -23,10 +23,14 @@
     <!-- Toggle Doctor -->
     <div class="row toggle-doctor">
       <div class="col-6">
-        <label for="select-doctor" class="calendar-menu-label">Doctor Name</label>
+        <label id="select-doctor-label" for="select-doctor" class="calendar-menu-label">Doctor Name</label>
         <select id="select-doctor" class="form-control" name="doctor">
           <!-- Dynamically Append options using Ajax on page load -->
         </select>
+      </div>
+      <!-- Welcome User -->
+      <div class="col-6" style="text-align: right;">
+        <p>Welcome: <span id="user-name"><!-- Append Here --></span></p>
       </div>
     </div>
 
@@ -50,7 +54,7 @@
         <div class="modal-body">
           <form>
             <!-- Hidden ID -->
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
               <label for="openAptModal-label-apt-id">AppointmentID</label>
               <input type="text" class="form-control-file" id="openAptModal-label-apt-id"  disabled>
             </div>
@@ -151,7 +155,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-success" id="bookedAptModal-televisit">TeleVisit</button>
-          <button type="button" class="btn btn-danger" id="bookedAptModal-cancel-apt">Remove</button>
+          <button type="button" class="btn btn-danger" id="bookedAptModal-cancel-apt">Cancel</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         </div>
       </div>

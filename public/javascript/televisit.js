@@ -62,4 +62,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
   }); // end ajax
 
+
+
+  // End Video Call
+  $("#EndTelevisit-Btn").on('click', function() {
+
+    // Get DoctorId
+    var doctorId = queries.doctorId;
+
+    // Re Direct to Appointments Calendar
+    var newURL = window.location.origin + "/calendar?userType=d&userId="+doctorId;
+    window.location.replace(newURL);
+        
+  });
+
 });

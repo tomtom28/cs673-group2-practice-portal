@@ -1,10 +1,18 @@
-var testDummy;
-
+var counterMax = 1; // tracks the maximum calendar counter value
 
 document.addEventListener('DOMContentLoaded', function() {
 
-  // Get Sunday of Today's Week
-  // var startOfCalander = GetCurrentWeekSunday().toJSON().slice(0,10);
+  // Get params
+  // https://stackoverflow.com/questions/4656843/get-querystring-from-url-using-jquery
+  var queries = {};
+  $.each(document.location.search.substr(1).split('&'),function(c,q){
+    var i = q.split('=');
+    queries[i[0].toString()] = i[1].toString();
+  });
+
+  // Parse UserId and UserType from URL
+  var userId = queries.userId;
+  var userType = queries.userType; // 'r' = receptionist, 'd' = doctor
 
   // Create Calendar
   var calendarEl = document.getElementById('calendar');
@@ -30,6 +38,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
       var addNewEvent = confirm('Add a New Appointment Time Slot?');
       if (addNewEvent) {
+
+        // TODO - Remove this once AJAX call to UpdateDoctorAvailability is supported
+        alert("Functionality currently not supported. \n" +
+              "Please contact Practice Management to update availablity.");
+        return false;
 
         // Get Date & Time Ranges
         var startMonth = arg.start.getMonth() + 1;
@@ -76,9 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
       var endMonth = arg.end.getMonth() + 1;
       var endDay = arg.end.getDate();
 
-      console.log(startDay)
-      console.log(endDay)
-
       // Call Helper Method to hit API and add all events to calendar within date range
       _this = this;
       GetDoctorEventsByDateRange(startMonth, startDay, endMonth, endDay, function(data) {
@@ -101,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var appointmentId = arg.event.id;
         var startTime = arg.event.start;
         var endTime = arg.event.end;
-        var doctorName = $("#select-doctor option:selected").text();
+        var doctorName = GetDoctorName();
 
         // Update Modal
         $("#openAptModal-label-apt-id").val(appointmentId);
@@ -118,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
           success: function(res) {
             // Append all Patients to the Dropdown menu
             $("#openAptModal-label-patient-name").empty();
-            $("#openAptModal-label-patient-name").append("<option>Please select...</option>");
+            $("#openAptModal-label-patient-name").append('<option value="0">Please select...</option>');
             for (var i=0; i < res.length; i++) {
               var patientHTML = '<option value="' + res[i].id + '">' + res[i].name + '</option>';
               $("#openAptModal-label-patient-name").append(patientHTML);
@@ -138,10 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var appointmentId = arg.event.id;
         var startTime = arg.event.start;
         var endTime = arg.event.end;
-        var doctorName = $("#select-doctor option:selected").text();
+        var doctorName = GetDoctorName();
         var patientName = arg.event.title;
         var isTeleVisit = arg.event.extendedProps.isTeleVisit;
-        console.log(isTeleVisit)
 
         // Update Modal
         $("#bookedAptModal-label-apt-id").val(appointmentId);
@@ -150,7 +159,10 @@ document.addEventListener('DOMContentLoaded', function() {
         $("#bookedAptModal-label-doctor-name").val(doctorName);
         $("#bookedAptModal-label-patient-name").val(patientName);
         if (isTeleVisit) {
-          $("#bookedAptModal-televisit").show(); // show button for tele visit
+          // Only show televist button if doctor is logged in
+          if (userType == 'd') {
+            $("#bookedAptModal-televisit").show(); // show button for tele visit
+          }
           $("#bookedAptModal-label-apt-type").empty();
           $("#bookedAptModal-label-apt-type").append('<option value="true">Tele-Visit</option>');
         }
@@ -173,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var appointmentId = arg.event.id;
         var startTime = arg.event.start;
         var endTime = arg.event.end;
-        var doctorName = $("#select-doctor option:selected").text();
+        var doctorName = GetDoctorName();
         var patientName = arg.event.extendedProps.patientName;
         var cancelledByName = arg.event.extendedProps.cancelledByName;
         var appointmentType = arg.event.extendedProps.appointmentType;
@@ -203,27 +215,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
   });
 
-  // Create Doctor Selector
-  $.ajax({
-    type: "GET",
-    url: UI_HELPER_API + "/doctors",
-    // headers: {
-    //   "Access-Control-Allow-Origin" : "https://group2-practice-portal.herokuapp.com",
-    //   'Access-Control-Allow-Methods' : 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-    //   'Access-Control-Allow-Headers' : 'Origin, Content-Type, X-Auth-Token'
-    // },
-    data: {},
-    success: function(res) {
-      // Iterate over response and append to DOM
-      for (var i=0; i < res.length; i++) {
-        console.log(res[i])
-        $("#select-doctor").append('<option value="' + res[i].doctorId + '">' + res[i].doctorName + '</option>');
+  // Add Logged In User Name
+  if (userType == 'r') {
+    $("#user-name").html("Receptionist");
+    $("#bookedAptModal-televisit").hide(); // hide button for tele visit
+  }
+  else {
+    $.ajax({
+      type: "GET",
+      url: INTERNAL_API + "/doctorname",
+      data: {
+        "doctorId" : userId
+      },
+      success: function(res) {
+        // Append Doctor Name to DOM
+        $("#user-name").html(res.doctorName);
+      },
+      error: function(err) {
+        console.log(err);
+        $("#user-name").html("Undefined");
       }
-      // Render Calendar
-      calendar.render();
-    }
-  });
+    });
 
+  }
+
+  // Update Doctor Selector, if Receptionist
+  if (userType == 'r') {
+    $.ajax({
+      type: "GET",
+      url: UI_HELPER_API + "/doctors",
+      // headers: {
+      //   "Access-Control-Allow-Origin" : "https://group2-practice-portal.herokuapp.com",
+      //   'Access-Control-Allow-Methods' : 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+      //   'Access-Control-Allow-Headers' : 'Origin, Content-Type, X-Auth-Token'
+      // },
+      data: {},
+      success: function(res) {
+        // Iterate over response and append to DOM
+        for (var i=0; i < res.length; i++) {
+          $("#select-doctor").append('<option value="' + res[i].doctorId + '">' + res[i].doctorName + '</option>');
+        }
+        // Render Calendar
+        calendar.render();
+      }
+    });
+  }
+  // Otherwise, Hide Doctor Selector
+  else {
+    $("#select-doctor").hide();
+    $("#select-doctor-label").hide();
+    calendar.render();
+  }
 
   // Calendar Helper: Dr Name was Changed
   $("#select-doctor").change(function(){
@@ -239,7 +281,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Call Helper Method to hit API and add all events to calendar within date range
     GetDoctorEventsByDateRange(startMonth, startDay, endMonth, endDay, function(data) {
-      console.log(data)
       for (var _event of data) {
         calendar.addEvent(_event);
       }
@@ -252,15 +293,15 @@ document.addEventListener('DOMContentLoaded', function() {
     _callback) {
 
     // Get Doctor Id
-    var doctorId = $("#select-doctor").val();
+    var doctorId = GetDoctorId();
 
     // Initialize response
     var myResponse = [];
 
-    // First, get Open Timeslots
+    // First, get open timeslots (minus booked slot conflicts)
     $.ajax({
       type: "GET",
-      url: UI_HELPER_API + "/open",
+      url: INTERNAL_API + "/unbooked",
       data: {
         "doctorId" : doctorId,
         "startMonth" : startMonth,
@@ -284,6 +325,8 @@ document.addEventListener('DOMContentLoaded', function() {
             counter++;
           }
         }
+        // Store counter max value to prevent collisions
+        counterMax = counter;
 
         // Second, get Booked Timeslots
         $.ajax({
@@ -317,22 +360,6 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
 
-            // TODO - Add another AJAX call for cancelled slots?
-            //   {
-            //     id: 5,
-            //     title: 'Cancellation',
-            //     start: '2020-11-06T16:30:00',
-            //     end: '2020-11-06T17:30:00',
-            //     className: 'pp-calendar-cancelled',
-            //     extendedProps: {
-            //       patientName: "Young, Angela",
-            //       cancelledById: 101,
-            //       cancelledByName: 'Young, Angela',
-            //       appointmentType: "In-Person"
-            //     }
-            //   }
-
-            console.log(myResponse);
             return _callback(myResponse);
 
           } // end success 2
@@ -344,15 +371,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Calendar Helper: Call API to update Doctor Availablity
   function UpdateDoctorAvailability(startMonth, startDay, startHour, startMinute,
-    endMonth, endDay, endHour, endMinute,
-    _callback) {
+    endMonth, endDay, endHour, endMinute, _callback) {
 
-    // Get Doctor Id
-    var doctorId = $("#select-doctor").val();
-
-    // TODO add an AJAX call here
-    // GET params: doctorId, startMonth, startDay, startHour, startMinute, endMonth, endDay, endHour, endMinute
-    return _callback(true, false);
+    // TODO - AJAX Call, if supported by Group 4 in future
+    return _callback(false, false);
 
   }
 
@@ -366,84 +388,126 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
   // Modal Helper: Cancelled Booked Appointment (by Practice)
-  $("#bookedAptModal-cancel-apt").on('click', function(){
+  $("#bookedAptModal-cancel-apt").on('click', function() {
+
+    // Ensure past event cannot be changed
+    var startDate = new Date($("#bookedAptModal-label-date-start-time").val());
+    if (startDate < new Date()) {
+      alert("Past appointments cannot be cancelled!");
+      return false;
+    }
 
     // Get Data Elements
     var appointmentId = $("#bookedAptModal-label-apt-id").val();
     var cancelledById = 301; // TODO - Where to get logged-in person Id?
 
-    //  TODO - AJAX Call
+    // Call UI Helper API to remove apt
+    $.ajax({
+       type:"POST",
+       url: UI_HELPER_API + "/booked",
+       data:{
+        "appointmentId" : appointmentId,
+        "cancelledById": cancelledById
+       },
+       success: function(res) {
+         // Get Event Properties & Remove Event
+         var _event = calendar.getEventById(appointmentId);
+         var startDateTime = _event.start;
+         var endDateTime = _event.end;
+         _event.remove();
 
-      // Remove Event
-      var _event = calendar.getEventById(appointmentId);
-      // Event Properties
-      var startDateTime = _event.start;
-      var endDateTime = _event.end;
-      _event.remove();
+         // Add Back Updated Event with updated Values
+         var _updatedEvent = {
+           id: ++counterMax,
+           title: 'Available',
+           start: startDateTime,
+           end: endDateTime,
+           className: 'pp-calendar-open'
+         }
+         calendar.addEvent(_updatedEvent);
 
-      // Add Back Updated Event with updated Values
-      var _updatedEvent = {
-        id: appointmentId,
-        title: 'Cancellation',
-        start: startDateTime,
-        end: endDateTime,
-        className: 'pp-calendar-cancelled',
-        extendedProps: {
-          patientName: "Patient Name",
-          cancelledById: cancelledById,
-          cancelledByName: 'Receptionist Jane',
-        }
-      }
-      calendar.addEvent(_updatedEvent);
+       },
+       error: function(err) {
+         alert("Error. Unable to Cancel Booking!");
+       }
+     })
 
-      // Close Modal
-      $("#bookedAptModal").modal('hide');
-
+    // Close Modal
+    $("#bookedAptModal").modal('hide');
     return false;
-
-
   });
 
 
   // Modal Helper: Book New Appointment (by Practice)
   $("#openAptModal-book-apt").on('click', function() {
 
+    // Ensure past event cannot be changed
+    var startDate = new Date($("#openAptModal-label-date-start-time").val());
+    if (startDate < new Date()) {
+      alert("Past appointments cannot be scheduled!");
+      return false;
+    }
+
     // Get Data Elements
     var openId = $("#openAptModal-label-apt-id").val();
     var isTeleVisit = $("#openAptModal-label-apt-type").val();
-    var doctorId = $("#select-doctor").val();
+    var doctorId = GetDoctorId();
     var patientId = $("#openAptModal-label-patient-name").val();
+    var patientName = $("#openAptModal-label-patient-name :selected")[0].text;
 
-    //  TODO - AJAX Call
-    // .done(function(res, err){
-    //
-    // })
+    // Ensure Patient Name was selected
+    if (patientId == 0) {
+      alert("Please Select a Patient Name from the Dropdown menu.")
+      return false;
+    }
 
-      // Remove Event
-      var _event = calendar.getEventById(openId);
-      // Event Properties
-      var startDateTime = _event.start;
-      var endDateTime = _event.end;
-      _event.remove();
+    // Parse Start / End Date Times
+    var startDateTime = FormatDateTime(new Date($("#openAptModal-label-date-start-time").val()));
+    var endDateTime = FormatDateTime(new Date($("#openAptModal-label-date-end-time").val()));
 
-      // Add Back Updated Event with updated Values
-      var _updatedEvent = {
-        id: 11,
-        title: 'Demo, Demi',
-        start: startDateTime,
-        end: endDateTime,
-        className: 'pp-calendar-booked',
-        extendedProps: {
-          patientId: 401,
-          doctorId: 420,
-          appointmentType: "In-Person"
-        }
-      }
-      calendar.addEvent(_updatedEvent);
+    // Call UI Helper API to book apt
+    $.ajax({
+       type:"POST",
+       url: UI_HELPER_API + "/open",
+       data:{
+        "doctorId" : doctorId,
+        "patientId" : patientId,
+        "startDateTime" : startDateTime,
+        "endDateTime" : endDateTime,
+        "isTeleVisit" : isTeleVisit
+       },
+       success: function(res) {
+         // Get Event Properties & Remove Event
+         var _event = calendar.getEventById(openId);
+         //
+         var startDateTime = _event.start;
+         var endDateTime = _event.end;
+         _event.remove();
 
-      // Close Modal
-      $("#openAptModal").modal('hide');
+         var TODO_BOOKED_ID_FROM_API = 101;
 
+         // Add Back Updated Event with updated Values
+         var _updatedEvent = {
+           id: TODO_BOOKED_ID_FROM_API,
+           title: patientName,
+           start: startDateTime,
+           end: endDateTime,
+           className: 'pp-calendar-booked',
+           extendedProps: {
+             patientId: patientId,
+             doctorId: doctorId,
+             appointmentType: (isTeleVisit) ? "Tele-Visit" : "In-Person"
+           }
+         }
+         calendar.addEvent(_updatedEvent);
+       },
+       error: function(err) {
+         alert("Error. Unable to Create Booking!");
+       }
+     })
+
+    // Close Modal
+    $("#openAptModal").modal('hide');
     return false;
 
   });
@@ -453,18 +517,20 @@ document.addEventListener('DOMContentLoaded', function() {
   $("#openAptModal-delete-apt").on('click', function() {
     // Get Data Elements
     var openId = $("#openAptModal-label-apt-id").val();
-    var doctorId = $("#select-doctor").val();
+    var doctorId = GetDoctorId();
 
-    //  TODO - AJAX Call
+    //  TODO - AJAX Call, if supported by Group 4 in future
+    alert("Functionality currently not supported. \n" +
+          "Please contact Practice Management to update availablity.");
 
-      // Get Event Time Line
-      var _event = calendar.getEventById(openId);
-      var startDateTime = _event.start;
-      var endDateTime = _event.end;
-      _event.remove();
+    // Get Event Time Line
+    // var _event = calendar.getEventById(openId);
+    // var startDateTime = _event.start;
+    // var endDateTime = _event.end;
+    // _event.remove();
 
-      // Close Modal
-      $("#openAptModal").modal('hide');
+    // Close Modal
+    // $("#openAptModal").modal('hide');
 
     return false;
 
@@ -474,8 +540,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Modal Helper: Start TeleVist Session
   $("#bookedAptModal-televisit").on('click', function() {
 
+    // Ensure past televisit cannot be selected
+    var endDate = new Date($("#bookedAptModal-label-date-end-time").val());
+    if (endDate < new Date()) {
+      alert("Unable to redirect! TeleVisit has already ended!");
+      return false;
+    }
+
     // Get Appointment and Doctor
-    var doctorId = $("#select-doctor").val();
+    var doctorId = GetDoctorId();
     var appointmentId = $("#bookedAptModal-label-apt-id").val();
 
     // Redirect to TeleVisit
@@ -485,16 +558,62 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
 
-  // Get start of calendar (Sunday of current week)
-  function GetCurrentWeekSunday() {
-    var d = new Date();
-    var day = d.getDay(),
-    diff = (d.getDate() - day + (day == 0 ? -6 : 1)) - 1; // adjust when day is sunday
-    return new Date(d.setDate(diff));
+  // Helper Method: Format Date Time (YYYY-DD-MMTHH:mm)
+  function FormatDateTime(dateTimeObject) {
+
+    // Add 0's in front of single digits
+    var month = (dateTimeObject.getUTCMonth() + 1);
+    if (month < 10) {
+      month = "0" + month;
+    }
+
+    var day = dateTimeObject.getUTCDate();
+    if (day < 10) {
+      day = "0" + day;
+    }
+
+    var minutes = dateTimeObject.getMinutes();
+    if (minutes < 10) {
+      minutes = "0" + minutes;
+    }
+
+    var hours = dateTimeObject.getHours();
+    if (hours < 10) {
+      hours = "0" + hours;
+    }
+
+    // Format as YYYY-DD-MMTHH:mm
+    var dateTime = dateTimeObject.getUTCFullYear() + "-" + month + "-" + day +
+      "T" + hours + ":" + minutes;
+
+    return dateTime;
+
   }
 
 
+  // Helper Method: Get Doctor Id
+  function GetDoctorId() {
+    // Receptionist view, get from dropdown
+    if (userType == 'r') {
+      return doctorId = $("#select-doctor").val();
+    }
+    // Doctor view, get from params
+    else {
+      return userId;
+    }
+  }
 
+
+  // Helper Method: Get Doctor Name
+  function GetDoctorName() {
+    // Receptionist view, get from dropdown
+    if (userType == 'r') {
+      return $("#select-doctor option:selected").text();
+    }
+    else {
+      return $("#user-name").text();
+    }
+  }
 
 });
 

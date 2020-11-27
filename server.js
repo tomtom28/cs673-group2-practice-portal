@@ -1,8 +1,16 @@
+// Express and Body Parser
 const express = require('express');
 const bodyParser = require("body-parser");
 
+// For External API Calls
+const axios = require('axios').default;
+
 const app = express();
 const port = process.env.PORT || 3000; // Select either local port or Heroku default
+
+
+// UI Helper API Endpoint
+const UI_HELPER_API = "http://localhost:3000";
 
 // Use Body Parser
 app.use(bodyParser.urlencoded({
@@ -34,6 +42,7 @@ app.use(bodyParser.urlencoded({
 
 // set the view engine to ejs
 app.set('view engine', 'ejs');
+
 // server static assets (ex css, js, vendor)
 app.use(express.static('public'));
 
@@ -42,15 +51,114 @@ app.get('/', function(req, res) {
     res.render('pages/index');
 });
 
-// calendar
+// calendar page
 app.get('/calendar', function(req, res) {
     res.render('pages/calendar');
 });
 
-// televisit
+// televisit page
 app.get('/televisit', function(req, res) {
     res.render('pages/televisit');
 });
+
+// API endpoint to get Doctor Name
+app.get('/doctorname', function(req, res) {
+
+  let doctorId = req.query.doctorId;
+  let doctorName = "Undefined";
+
+  axios.get(UI_HELPER_API + '/doctors', {
+    params: {}
+  })
+  .then(function (response) {
+    let doctorList = response.data;
+    for (let i=0; i<doctorList.length; i++) {
+      if (doctorList[i].doctorId == doctorId) {
+        doctorName = doctorList[i].doctorName;
+        break;
+      }
+    }
+  })
+  .then(function() {
+    res.json({doctorName: doctorName})
+  })
+
+});
+
+// API endpoint to return unbooked open slots
+// (i.e. remove grey tiles that collide with blue)
+app.get('/unbooked', function(req, res) {
+
+  // First, Call UI Helper API for Booked Slots
+  let unbookedSlots = []; // open slots, minus booked overlap
+  let bookedSlots = [];
+  axios.get(UI_HELPER_API + '/booked', {
+    params: req.query
+  })
+  .then(function (response) {
+    // Iterate over all booked slots & track their start and endDateTimes
+    const resData = response.data;
+    for (var i=0; i<resData.length; i++) {
+      for (var j=0; j<resData[i].length; j++) {
+        var bookedSlot = {
+          startDate: resData[i][j].startDate,
+          endDate: resData[i][j].endDate,
+          startTime: resData[i][j].startTime,
+          endTime: resData[i][j].endTime
+        };
+        bookedSlots.push(bookedSlot);
+      }
+    }
+  })
+  .catch(function (error) {
+    console.log("Unable to parse booked appointments!")
+    console.log(error);
+  })
+  .then(function () {
+    // Second, Call UI Helper API for Open Slots
+    axios.get(UI_HELPER_API + '/open', {
+      params: req.query
+    })
+    .then(function (response) {
+      // Iterate over all open slots & remove any overlap
+      const resData2 = response.data;
+      for (let i=0; i<resData2.length; i++) {
+        let dateArray = []
+        for (let j=0; j<resData2[i].length; j++) {
+          // Check for overlap
+          let hasOverlap = false;
+          for (let k=0; k<bookedSlots.length; k++) {
+            if (
+              bookedSlots[k].startDate == resData2[i][j].startDate &&
+              bookedSlots[k].endDate == resData2[i][j].endDate &&
+              bookedSlots[k].startTime == resData2[i][j].startTime &&
+              bookedSlots[k].endTime == resData2[i][j].endTime
+            ) {
+              hasOverlap = true;
+            }
+          }
+          // Only add the timeslot if there is not overlap
+          if (!hasOverlap) {
+            dateArray.push(resData2[i][j]);
+          }
+        }
+        // Only add the date array if there is at least 1 open slot
+        if (dateArray.length > 0) unbookedSlots.push(dateArray);
+      }
+    })
+    .catch(function (error) {
+      console.log("Unable to parse booked appointments!")
+      console.log(error);
+    })
+    .then(function () {
+      // Finally, return results
+      res.json(unbookedSlots);
+    })
+  })
+
+});
+
+
 
 
 // ------------ Mock API Endpoint for Testing ------------
@@ -283,12 +391,28 @@ app.get('/open', function(req, res) {
     [
       {
         "title" : "Available",
+        "startDate" : "2020-" + startMonth + "-" + (startDate + 2),
+        "endDate" : "2020-" + startMonth + "-" + (startDate + 2),
+        "startTime" : "14:00",
+        "endTime" : "15:00"
+      }
+    ],
+    [
+      {
+        "title" : "Available",
         "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
         "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
         "startTime" : "11:00",
         "endTime" : "12:00",
       },
-    ],
+      {
+        "title" : "Available",
+        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
+        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
+        "startTime" : "13:30",
+        "endTime" : "14:00",
+      }
+    ]
   ];
 
   if (doctorId == 1) {
@@ -310,7 +434,7 @@ app.get('/booked', function(req, res) {
   let endDate = Number(req.query.endDate);
 
 
-  let sampleOpenSlotsDoctor1 = [
+  let sampleBookedSlotsDoctor1 = [
     [
       {
         "id" : 101,
@@ -363,7 +487,7 @@ app.get('/booked', function(req, res) {
     ],
   ];
 
-  let sampleOpenSlotsDoctor2 = [
+  let sampleBookedSlotsDoctor2 = [
     [
       {
         "id" : 106,
@@ -393,10 +517,10 @@ app.get('/booked', function(req, res) {
   ];
 
   if (doctorId == 1) {
-    res.json(sampleOpenSlotsDoctor1);
+    res.json(sampleBookedSlotsDoctor1);
   }
   else {
-    res.json(sampleOpenSlotsDoctor2);
+    res.json(sampleBookedSlotsDoctor2);
   }
 
 
