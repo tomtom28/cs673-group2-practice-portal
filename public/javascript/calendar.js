@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // TODO - Remove this once AJAX call to UpdateDoctorAvailability is supported
         alert("Functionality currently not supported. \n" +
-              "Please contact Practice Management to update availablity.");
+              "Please contact Practice Management to update availability.");
         return false;
 
         // Get Date & Time Ranges
@@ -521,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     //  TODO - AJAX Call, if supported by Group 4 in future
     alert("Functionality currently not supported. \n" +
-          "Please contact Practice Management to update availablity.");
+          "Please contact Practice Management to update availability.");
 
     // Get Event Time Line
     // var _event = calendar.getEventById(openId);
