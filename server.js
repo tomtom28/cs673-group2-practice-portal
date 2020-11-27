@@ -10,7 +10,9 @@ const port = process.env.PORT || 3000; // Select either local port or Heroku def
 
 
 // UI Helper API Endpoint
-const UI_HELPER_API = "http://localhost:3000";
+// const UI_HELPER_API = "http://localhost:3000";
+const UI_HELPER_API = "https://group2-practice-portal.herokuapp.com";
+
 
 // Use Body Parser
 app.use(bodyParser.urlencoded({
