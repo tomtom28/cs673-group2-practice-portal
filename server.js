@@ -10,8 +10,8 @@ const port = process.env.PORT || 3000; // Select either local port or Heroku def
 
 
 // UI Helper API Endpoint
-// const UI_HELPER_API = "http://localhost:3000";
-const UI_HELPER_API = "https://group2-practice-portal.herokuapp.com";
+const UI_HELPER_API = "http://localhost:3000";
+// const UI_HELPER_API = "https://group2-practice-portal.herokuapp.com";
 
 
 // Use Body Parser
@@ -209,8 +209,13 @@ app.get('/patients', function(req, res) {
   res.json(samplePatients);
 });
 
+// TeleVisit: Get Patient Info
+app.get("/patient-by-apt-id", function(req, res) {
+  res.json({patientName : "Demo, Johnny"});
+})
 
-// TeleVist Creation
+
+// TeleVisit: Video Creation
 app.post("/televisit", function(req, res) {
   console.log(req.body);
 
@@ -221,6 +226,20 @@ app.post("/televisit", function(req, res) {
   }
 
   res.json(sampleAuthTokens)
+});
+
+// TeleVisit: Consultation Summary Upload
+app.post("/consultation-summary", function(req, res) {
+  console.log(req.body);
+  res.json({});
+});
+
+
+// TeleVisit: Consultation File Upload
+app.post("/chart-notes", function(req, res) {
+  console.log(req.query);
+  console.log(req.formData);
+  res.json({});
 });
 
 

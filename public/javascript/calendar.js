@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Get Data Elements
     var appointmentId = $("#bookedAptModal-label-apt-id").val();
-    var cancelledById = 301; // TODO - Where to get logged-in person Id?
+    var cancelledById = userId; // from login session
 
     // Call UI Helper API to remove apt
     $.ajax({
