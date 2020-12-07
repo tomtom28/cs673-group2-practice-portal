@@ -1,4 +1,6 @@
-var counterMax = 1; // tracks the maximum calendar counter value
+var counterStart = 1000000000000; // sets an very large number for open slot id's to avoid collisions with real apt ids
+var counterMax = counterStart + 1; // tracks the maximum calendar counter value
+var TEST_TEMP;
 
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -88,10 +90,12 @@ document.addEventListener('DOMContentLoaded', function() {
       var startDay = arg.start.getDate();
       var endMonth = arg.end.getMonth() + 1;
       var endDay = arg.end.getDate();
+      var startYear = arg.start.getUTCFullYear();
+      var endYear = arg.end.getUTCFullYear();
 
       // Call Helper Method to hit API and add all events to calendar within date range
       _this = this;
-      GetDoctorEventsByDateRange(startMonth, startDay, endMonth, endDay, function(data) {
+      GetDoctorEventsByDateRange(startMonth, startDay, startYear, endMonth, endDay, endYear, function (data) {
         for (var _event of data) {
           _this.addEvent(_event);
         }
@@ -123,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // AJAX Call to get all Patients in Practice
         $.ajax({
           type: "GET",
-          url: UI_HELPER_API + "/patients",
+          url: INTERNAL_API + "/patients",
           data: {},
           success: function(res) {
             // Append all Patients to the Dropdown menu
@@ -149,15 +153,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var startTime = arg.event.start;
         var endTime = arg.event.end;
         var doctorName = GetDoctorName();
-        var patientName = arg.event.title;
+        var apptTitle = arg.event.title;
         var isTeleVisit = arg.event.extendedProps.isTeleVisit;
+        var patientId = apptTitle.split(" ")[1]; // get patient Id
 
         // Update Modal
         $("#bookedAptModal-label-apt-id").val(appointmentId);
         $("#bookedAptModal-label-date-start-time").val(startTime);
         $("#bookedAptModal-label-date-end-time").val(endTime);
         $("#bookedAptModal-label-doctor-name").val(doctorName);
-        $("#bookedAptModal-label-patient-name").val(patientName);
+
         if (isTeleVisit) {
           // Only show televist button if doctor is logged in
           if (userType == 'd') {
@@ -170,11 +175,29 @@ document.addEventListener('DOMContentLoaded', function() {
           $("#bookedAptModal-televisit").hide(); // hide button for tele visit
           $("#bookedAptModal-label-apt-type").empty();
           $("#bookedAptModal-label-apt-type").append('<option value="false">In-Person</option>');
-
         }
 
-        // Show modal
-        $('#bookedAptModal').modal('show');
+        // Query for Patient Name
+        $.ajax({
+          type: "GET",
+          url: INTERNAL_API + "/patientname",
+          data: {
+            "patientId" : patientId
+          },
+          success: function(res) {
+            // Append Patient Name to DOM
+            patientName = res.patientName;
+          },
+          error: function(err) {
+            console.log(err);
+            patientName = "Undefined";
+          }
+        })
+        .then(function() {
+          // Show modal
+          $("#bookedAptModal-label-patient-name").val(patientName);
+          $('#bookedAptModal').modal('show');
+        })
 
       }
 
@@ -243,17 +266,12 @@ document.addEventListener('DOMContentLoaded', function() {
   if (userType == 'r') {
     $.ajax({
       type: "GET",
-      url: UI_HELPER_API + "/doctors",
-      // headers: {
-      //   "Access-Control-Allow-Origin" : "https://group2-practice-portal.herokuapp.com",
-      //   'Access-Control-Allow-Methods' : 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-      //   'Access-Control-Allow-Headers' : 'Origin, Content-Type, X-Auth-Token'
-      // },
+      url: INTERNAL_API + "/doctors",
       data: {},
       success: function(res) {
         // Iterate over response and append to DOM
         for (var i=0; i < res.length; i++) {
-          $("#select-doctor").append('<option value="' + res[i].doctorId + '">' + res[i].doctorName + '</option>');
+          $("#select-doctor").append('<option value="' + res[i].id + '">' + res[i].name + '</option>');
         }
         // Render Calendar
         calendar.render();
@@ -276,11 +294,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get Date Ranges
     var startMonth = calendar.view.getCurrentData().dateProfile.currentRange.start.getMonth() + 1;
     var startDay = calendar.view.getCurrentData().dateProfile.currentRange.start.getDate();
+    var startYear = calendar.view.getCurrentData().dateProfile.currentRange.start.getUTCFullYear();
     var endMonth = calendar.view.getCurrentData().dateProfile.currentRange.end.getMonth() + 1;
     var endDay = calendar.view.getCurrentData().dateProfile.currentRange.end.getDate();
+    var endYear = calendar.view.getCurrentData().dateProfile.currentRange.end.getUTCFullYear();
 
     // Call Helper Method to hit API and add all events to calendar within date range
-    GetDoctorEventsByDateRange(startMonth, startDay, endMonth, endDay, function(data) {
+    GetDoctorEventsByDateRange(startMonth, startDay, startYear, endMonth, endDay, endYear, function(data) {
       for (var _event of data) {
         calendar.addEvent(_event);
       }
@@ -289,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
   // Calendar Helper: Call API for Date Range
-  function GetDoctorEventsByDateRange(startMonth, startDate, endMonth, endDate,
+  function GetDoctorEventsByDateRange(startMonth, startDay, startYear, endMonth, endDay, endYear,
     _callback) {
 
     // Get Doctor Id
@@ -305,13 +325,15 @@ document.addEventListener('DOMContentLoaded', function() {
       data: {
         "doctorId" : doctorId,
         "startMonth" : startMonth,
-        "startDate" : startDate,
+        "startDay" : startDay,
+        "startYear" : startYear,
         "endMonth" : endMonth,
-        "endDate" : endDate
+        "endDay" : endDay,
+        "endYear" : endYear
       },
       success: function (res1) {
         // Format and Append all Open Slots
-        var counter = 0;
+        var counter = counterStart;
         for (var i=0; i<res1.length; i++) {
           for (var j=0; j<res1[i].length; j++) {
             var openSlot = {
@@ -331,39 +353,42 @@ document.addEventListener('DOMContentLoaded', function() {
         // Second, get Booked Timeslots
         $.ajax({
           type: "GET",
-          url: UI_HELPER_API + "/booked",
+          url: INTERNAL_API + "/booked",
           data: {
             "doctorId" : doctorId,
             "startMonth" : startMonth,
-            "startDate" : startDate,
+            "startDay" : startDay,
+            "startYear" : startYear,
             "endMonth" : endMonth,
-            "endDate" : endDate
+            "endDay" : endDay,
+            "endYear" : endYear
           },
           success: function (res2) {
             // Format and Append all Booked Slots
             for (var i=0; i<res2.length; i++) {
-              for (var j=0; j<res2[i].length; j++) {
-                var bookedSlot = {
-                  id : counter,
-                  title: res2[i][j].title,
-                  start: res2[i][j].startDate + "T" + res2[i][j].startTime,
-                  end: res2[i][j].endDate + "T" + res2[i][j].endTime,
-                  className: 'pp-calendar-booked',
-                  extendedProps: {
-                    isTeleVisit: res2[i][j].isTeleVisit,
-                    patientId: res2[i][j].patientId,
-                    doctorId: res2[i][j].doctorId
-                  }
-                };
-                myResponse.push(bookedSlot);
-                counter++;
-              }
+              var bookedSlot = {
+                id : res2[i].id,
+                title: res2[i].title,
+                start: res2[i].startDate + "T" + res2[i].startTime,
+                end: res2[i].endDate + "T" + res2[i].endTime,
+                className: 'pp-calendar-booked',
+                extendedProps: {
+                  isTeleVisit: res2[i].isTeleVisit,
+                  patientId: res2[i].patientId,
+                  doctorId: res2[i].doctorId
+                }
+              };
+              myResponse.push(bookedSlot);
             }
 
             return _callback(myResponse);
 
           } // end success 2
         }); // end AJAX call 2
+      },
+      error: function (err) {
+        alert("Error. Unable to get calendar.\nContact Support.");
+        console.log(err);
       } // end success 1
     }); // end AJAX call 1
 
@@ -404,14 +429,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Call UI Helper API to remove apt
     $.ajax({
        type:"POST",
-       url: UI_HELPER_API + "/booked",
+       url: INTERNAL_API + "/booked",
        data:{
         "appointmentId" : appointmentId,
         "cancelledById": cancelledById
        },
        success: function(res) {
+
          // Get Event Properties & Remove Event
          var _event = calendar.getEventById(appointmentId);
+         console.log(_event)
          var startDateTime = _event.start;
          var endDateTime = _event.end;
          _event.remove();
@@ -425,7 +452,6 @@ document.addEventListener('DOMContentLoaded', function() {
            className: 'pp-calendar-open'
          }
          calendar.addEvent(_updatedEvent);
-
        },
        error: function(err) {
          alert("Error. Unable to Cancel Booking!");
@@ -464,12 +490,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Parse Start / End Date Times
     var startDateTime = FormatDateTime(new Date($("#openAptModal-label-date-start-time").val()));
     var endDateTime = FormatDateTime(new Date($("#openAptModal-label-date-end-time").val()));
+    console.log(startDateTime)
 
     // Call UI Helper API to book apt
     $.ajax({
        type:"POST",
-       url: UI_HELPER_API + "/open",
-       data:{
+       url: INTERNAL_API + "/open",
+       data: {
         "doctorId" : doctorId,
         "patientId" : patientId,
         "startDateTime" : startDateTime,
@@ -484,12 +511,10 @@ document.addEventListener('DOMContentLoaded', function() {
          var endDateTime = _event.end;
          _event.remove();
 
-         var TODO_BOOKED_ID_FROM_API = 101;
-
          // Add Back Updated Event with updated Values
          var _updatedEvent = {
-           id: TODO_BOOKED_ID_FROM_API,
-           title: patientName,
+           id: res.appointment_id,
+           title: "Patient " + patientId,
            start: startDateTime,
            end: endDateTime,
            className: 'pp-calendar-booked',

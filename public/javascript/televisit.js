@@ -15,24 +15,21 @@ document.addEventListener('DOMContentLoaded', function() {
   // Call UI Helper API to get Tokens
   $.ajax({
     type: "POST",
-    url: UI_HELPER_API + "/televisit",
+    url: INTERNAL_API + "/televisit",
     data: {
       "doctorId" : queries.doctorId,
       "appointmentId" : queries.appointmentId
     },
     success: function (res) {
-
       // Get Tokens from API response
-      console.log(res);
-      var apiKey;
+
       var sessionId;
       var token;
       try {
-        apiKey = res.apiKey;
-        sessionId = res.sessionId;
-        token = res.token;
+        sessionId = res.session_id;
+        token = res.doctor_token;
       } catch (err) {
-        alert("Unable to Create TeleVisit Session! Invalid Credentials!")
+        alert("Unable to Create TeleVisit Session! Invalid Credentials!");
       }
 
       // Open Tok Code Below...
@@ -44,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       function initializeSession() {
-        session = OT.initSession(apiKey, sessionId);
+        session = OT.initSession(API_KEY, sessionId);
 
         // Create a publisher
         publisher = OT.initPublisher('publisher', {}, handleError);
@@ -63,12 +60,29 @@ document.addEventListener('DOMContentLoaded', function() {
   // Append Patient Info
   $.ajax({
     type: "GET",
-    url: UI_HELPER_API + "/patient-by-apt-id",
+    url: INTERNAL_API + "/appointment",
     data: {
       "appointmentId" : queries.appointmentId
     },
-    success: function (res) {
-      $("#patientInfo-Name").val(res.patientName);
+    success: function (res1) {
+      $.ajax({
+        type: "GET",
+        url: INTERNAL_API + "/patientName",
+        data: {
+          "appointmentId" : queries.appointmentId
+        },
+        success: function (res2) {
+          $("#patientInfo-Name").val(res2.patientName);
+        },
+        error: function(err) {
+          console.log(err);
+          $("#patientInfo-Name").val("Undefined");
+        }
+      })
+    },
+    error: function(err) {
+      console.log(err);
+      $("#patientInfo-Name").val("Undefined");
     }
   })
 

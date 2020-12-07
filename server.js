@@ -9,9 +9,9 @@ const app = express();
 const port = process.env.PORT || 3000; // Select either local port or Heroku default
 
 
-// UI Helper API Endpoint
-const UI_HELPER_API = "http://localhost:3000";
-// const UI_HELPER_API = "https://group2-practice-portal.herokuapp.com";
+// UI Helper API Endpoint & Constants
+const UI_HELPER_API = "https://ui-helper.herokuapp.com";
+const CANCELLED_APT_CODE = 3;
 
 
 // Use Body Parser
@@ -19,34 +19,14 @@ app.use(bodyParser.urlencoded({
     extended: true
 }));
 
-// Fix CORS issue
-// https://stackoverflow.com/questions/18310394/no-access-control-allow-origin-node-apache-port-issue
-// app.use(function (req, res, next) {
-//
-//   console.log("hit")
-//
-//     // Website you wish to allow to connect
-//     res.setHeader('Access-Control-Allow-Origin', 'https://group2-practice-portal.herokuapp.com');
-//
-//     // Request methods you wish to allow
-//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-//
-//     // Request headers you wish to allow
-//     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-//
-//     // Set to true if you need the website to include cookies in the requests sent
-//     // to the API (e.g. in case you use sessions)
-//     res.setHeader('Access-Control-Allow-Credentials', true);
-//
-//     // Pass to next layer of middleware
-//     next();
-// });
 
 // set the view engine to ejs
 app.set('view engine', 'ejs');
 
 // server static assets (ex css, js, vendor)
 app.use(express.static('public'));
+
+// Render Pages ...
 
 // index page
 app.get('/', function(req, res) {
@@ -63,26 +43,49 @@ app.get('/televisit', function(req, res) {
     res.render('pages/televisit');
 });
 
+
+// Helper Endpoints ...
+
 // API endpoint to get Doctor Name
 app.get('/doctorname', function(req, res) {
 
   let doctorId = req.query.doctorId;
   let doctorName = "Undefined";
 
-  axios.get(UI_HELPER_API + '/doctors', {
+  axios.get(UI_HELPER_API + '/all_doctors', {
     params: {}
   })
   .then(function (response) {
     let doctorList = response.data;
     for (let i=0; i<doctorList.length; i++) {
-      if (doctorList[i].doctorId == doctorId) {
-        doctorName = doctorList[i].doctorName;
+      if (doctorList[i].id == doctorId) {
+        doctorName = doctorList[i].name;
         break;
       }
     }
   })
   .then(function() {
     res.json({doctorName: doctorName})
+  });
+
+});
+
+// API endpoint to get Doctor Name
+app.get('/patientname', function(req, res) {
+
+  let patientId = req.query.patientId;
+  let patientName = "Undefined";
+
+  axios.get(UI_HELPER_API + '/single_patient_info', {
+    params: {
+      patient_id : patientId
+    }
+  })
+  .then(function (response) {
+    patientName = response.data.patient_first_name + " " + response.data.patient_last_name;
+  })
+  .then(function () {
+    res.json({patientName: patientName})
   });
 
 });
@@ -94,19 +97,26 @@ app.get('/unbooked', function(req, res) {
   // First, Call UI Helper API for Booked Slots
   let unbookedSlots = []; // open slots, minus booked overlap
   let bookedSlots = [];
-  axios.get(UI_HELPER_API + '/booked', {
-    params: req.query
+  axios.get(UI_HELPER_API + '/get_all_appoitments', {
+    params: {
+      "id" : req.query.doctorId,
+    }
   })
   .then(function (response) {
     // Iterate over all booked slots & track their start and endDateTimes
     const resData = response.data;
-    for (var i=0; i<resData.length; i++) {
-      for (var j=0; j<resData[i].length; j++) {
-        var bookedSlot = {
-          startDate: resData[i][j].startDate,
-          endDate: resData[i][j].endDate,
-          startTime: resData[i][j].startTime,
-          endTime: resData[i][j].endTime
+    for (let i=0; i<resData.length; i++) {
+
+      // Only append non-cancelled appoitments
+      if (resData[i].appointment_status != CANCELLED_APT_CODE) {
+        // Parse for Dates / Times
+        let startDateTime = new Date(resData[i].start_time);
+        let endDateTime = new Date(resData[i].end_time);
+        let bookedSlot = {
+          startDate: FormatDate(startDateTime),
+          endDate: FormatDate(endDateTime),
+          startTime: FormatTime(startDateTime),
+          endTime: FormatTime(endDateTime)
         };
         bookedSlots.push(bookedSlot);
       }
@@ -115,13 +125,20 @@ app.get('/unbooked', function(req, res) {
   .catch(function (error) {
     console.log("Unable to parse booked appointments!")
     console.log(error);
+    // res.status(500).send('Error calling API!');
   })
   .then(function () {
     // Second, Call UI Helper API for Open Slots
     axios.get(UI_HELPER_API + '/open', {
-      params: req.query
+      params: {
+        "doctorId" : req.query.doctorId,
+        "StartDate" : req.query.startYear + '/' + req.query.startMonth + "/" + req.query.startDay,
+        "EndDate" : req.query.endYear + '/' + req.query.endMonth + '/' + req.query.endDay
+      }
     })
     .then(function (response) {
+      // console.log(response.data)
+
       // Iterate over all open slots & remove any overlap
       const resData2 = response.data;
       for (let i=0; i<resData2.length; i++) {
@@ -151,6 +168,7 @@ app.get('/unbooked', function(req, res) {
     .catch(function (error) {
       console.log("Unable to parse booked appointments!")
       console.log(error);
+      res.status(500).send('Error calling API!');
     })
     .then(function () {
       // Finally, return results
@@ -161,393 +179,156 @@ app.get('/unbooked', function(req, res) {
 });
 
 
-
-
-// ------------ Mock API Endpoint for Testing ------------
-
-// Get all Doctors
-app.get('/doctors', function(req, res) {
-  let sampleDoctors = [
-    {
-      "doctorId" : 1,
-      "doctorName" : "Jasani, Shruti"
-    },
-    {
-      "doctorId" : 2,
-      "doctorName" : "Price, Phil"
-    }
-  ];
-  res.json(sampleDoctors);
+// ------------ Proxy Endpoints for CORS issues ------------
+app.get("/doctors", function(req, res) {
+  // Query UI helper
+  axios.get(UI_HELPER_API + '/all_doctors', {})
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
 });
 
-
-// Get all patients
-app.get('/patients', function(req, res) {
-  let samplePatients = [
-    {
-      "id" : 1,
-      "name" : "Monster, Cookie"
-    },
-    {
-      "id" : 201,
-      "name" : "Archer, Sterling"
-    },
-    {
-      "id" : 301,
-      "name" : "Brown, John"
-    },
-    {
-      "id" : 501,
-      "name" : "Jones, Mike"
-    },
-    {
-      "id" : 921,
-      "name" : "Wayne, Bruce"
-    }
-  ]
-
-  res.json(samplePatients);
+app.get("/patients", function(req, res) {
+  // Query UI helper
+  axios.get(UI_HELPER_API + '/all_patients', {})
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
 });
 
-// TeleVisit: Get Patient Info
-app.get("/patient-by-apt-id", function(req, res) {
-  res.json({patientName : "Demo, Johnny"});
-})
-
-
-// TeleVisit: Video Creation
-app.post("/televisit", function(req, res) {
-  console.log(req.body);
-
-  var sampleAuthTokens = {
-    apiKey : "46950324",
-    sessionId : "2_MX40Njk1MDMyNH5-MTYwNDg5Mzg5MzAwMH5wdndpN0pxSWZWaVNFQitab3NUa3lmU1B-UH4",
-    token : "T1==cGFydG5lcl9pZD00Njk1MDMyNCZzaWc9ZWUzODBmYjdkMDIxOGY4OWE5YTJiOTRiMDg2MDVlYWFiMDEzZDY0Nzpyb2xlPXB1Ymxpc2hlciZzZXNzaW9uX2lkPTJfTVg0ME5qazFNRE15Tkg1LU1UWXdORGc1TXpnNU16QXdNSDV3ZG5kcE4wcHhTV1pXYVZORlFpdGFiM05VYTNsbVUxQi1VSDQmY3JlYXRlX3RpbWU9MTYwNDg5Mzg5MyZub25jZT0wLjExNjg0NTkyNDQ2NTg4MTgyJmV4cGlyZV90aW1lPTE2MDc0ODU4OTM=",
-  }
-
-  res.json(sampleAuthTokens)
+app.post("/open", function(req, res) {
+  // Query UI helper
+  axios.post(UI_HELPER_API + '/create_appoitment', {
+    "patient_id" : req.body.patientId,
+    "doctor_id" : req.body.doctorId,
+    "start_time" : req.body.startDateTime,
+    "end_time" : req.body.endDateTime,
+    "tele_visit" : req.body.isTeleVisit
+  })
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
 });
 
-// TeleVisit: Consultation Summary Upload
-app.post("/consultation-summary", function(req, res) {
-  console.log(req.body);
-  res.json({});
-});
-
-
-// TeleVisit: Consultation File Upload
-app.post("/chart-notes", function(req, res) {
-  console.log(req.query);
-  console.log(req.formData);
-  res.json({});
-});
-
-
-// Get all OPEN appointments in a date range
-app.get('/open', function(req, res) {
-
-  let doctorId = Number(req.query.doctorId);
-  let startMonth = Number(req.query.startMonth);
-  let endMonth = Number(req.query.endMonth);
-  let startDate = Number(req.query.startDate);
-  let endDate = Number(req.query.endDate);
-
-  let sampleOpenSlotsDoctor1 = [
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "09:00",
-        "endTime" : "09:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "10:00",
-        "endTime" : "10:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "11:00",
-        "endTime" : "12:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "14:00",
-        "endTime" : "15:00",
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "startTime" : "09:30",
-        "endTime" : "10:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "startTime" : "10:30",
-        "endTime" : "11:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "startTime" : "12:00",
-        "endTime" : "13:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 1),
-        "startTime" : "14:30",
-        "endTime" : "15:00",
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "startTime" : "09:00",
-        "endTime" : "09:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "startTime" : "10:00",
-        "endTime" : "10:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "startTime" : "11:00",
-        "endTime" : "12:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "startTime" : "14:00",
-        "endTime" : "15:00",
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "09:30",
-        "endTime" : "10:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "10:30",
-        "endTime" : "11:30",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "12:00",
-        "endTime" : "13:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "14:30",
-        "endTime" : "15:00",
-      }
-    ],
-  ];
-
-
-  let sampleOpenSlotsDoctor2 = [
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "09:00",
-        "endTime" : "10:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + startDate,
-        "endDate" : "2020-" + startMonth + "-" + startDate,
-        "startTime" : "13:00",
-        "endTime" : "14:00",
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + endMonth + "-" + (startDate + 1),
-        "startTime" : "12:00",
-        "endTime" : "13:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (startDate + 1),
-        "endDate" : "2020-" + endMonth + "-" + (startDate + 1),
-        "startTime" : "14:00",
-        "endTime" : "15:00",
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "startTime" : "14:00",
-        "endTime" : "15:00"
-      }
-    ],
-    [
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "11:00",
-        "endTime" : "12:00",
-      },
-      {
-        "title" : "Available",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "13:30",
-        "endTime" : "14:00",
-      }
-    ]
-  ];
-
-  if (doctorId == 1) {
-    res.json(sampleOpenSlotsDoctor1);
-  }
-  else {
-    res.json(sampleOpenSlotsDoctor2);
-  }
-});
-
-
-// Get all BOOKED appointments in a date range
+// (i.e. remove grey tiles that collide with blue)
 app.get('/booked', function(req, res) {
+  let bookedSlots = [];
+  // Query UI helper
+  axios.get(UI_HELPER_API + '/get_all_appoitments', {
+    params: {
+      "id" : req.query.doctorId,
+    }
+  })
+  .then(function (response) {
+    // Iterate over all booked slots & track their start and endDateTimes
+    const resData = response.data;
+    for (let i=0; i<resData.length; i++) {
+      // Only append non-cancelled appoitments
+      if (resData[i].appointment_status != CANCELLED_APT_CODE) {
 
-  let doctorId = Number(req.query.doctorId);
-  let startMonth = Number(req.query.startMonth);
-  let endMonth = Number(req.query.endMonth);
-  let startDate = Number(req.query.startDate);
-  let endDate = Number(req.query.endDate);
-
-
-  let sampleBookedSlotsDoctor1 = [
-    [
-      {
-        "id" : 101,
-        "title" : "Patient, Name", // Patient Name
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "startTime" : "11:30",
-        "endTime" : "12:00",
-        "doctorId" : 1,
-        "patientId" : 501,
-        "isTeleVisit" : false
-      },
-      {
-        "id" : 102,
-        "title" : "Smith, John",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "startTime" : "14:00",
-        "endTime" : "15:00",
-        "doctorId" : 1,
-        "patientId" : 502,
-        "isTeleVisit" : true
+        // Parse for Dates / Times
+        let startDateTime = new Date(resData[i].start_time);
+        let endDateTime = new Date(resData[i].end_time);
+        let bookedSlot = {
+          id: resData[i].appointment_id,
+          title: "Patient " + resData[i].patient_id, // todo
+          startDate: FormatDate(startDateTime),
+          endDate: FormatDate(endDateTime),
+          startTime: FormatTime(startDateTime),
+          endTime: FormatTime(endDateTime),
+          doctorId: resData[i].doctor_id,
+          patientId: resData[i].patient_id,
+          isTeleVisit: true //resData[i].isTeleVisit // todo
+        };
+        bookedSlots.push(bookedSlot);
       }
-    ],
-    [
-      {
-        "id" : 103,
-        "title" : "Sigh, Andre",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 3),
-        "startTime" : "15:00",
-        "endTime" : "15:30",
-        "doctorId" : 1,
-        "patientId" : 503,
-        "isTeleVisit" : true
-      }
-    ],
-    [
-      {
-        "id" : 104,
-        "title" : "Yan, Ted",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "08:30",
-        "endTime" : "09:00",
-        "doctorId" : 1,
-        "patientId" : 504,
-        "isTeleVisit" : false
-      }
-    ],
-  ];
-
-  let sampleBookedSlotsDoctor2 = [
-    [
-      {
-        "id" : 106,
-        "title" : "Hope, Jenna",
-        "startDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "endDate" : "2020-" + startMonth + "-" + (startDate + 2),
-        "startTime" : "14:00",
-        "endTime" : "15:00",
-        "doctorId" : 1,
-        "patientId" : 506,
-        "isTeleVisit" : false
-      }
-    ],
-    [
-      {
-        "id" : 105,
-        "title" : "Paterson, William",
-        "startDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "endDate" : "2020-" + endMonth + "-" + (endDate - 2),
-        "startTime" : "13:30",
-        "endTime" : "14:00",
-        "doctorId" : 1,
-        "patientId" : 505,
-        "isTeleVisit" : true
-      }
-    ],
-  ];
-
-  if (doctorId == 1) {
-    res.json(sampleBookedSlotsDoctor1);
-  }
-  else {
-    res.json(sampleBookedSlotsDoctor2);
-  }
-
-
+    }
+    res.json(bookedSlots);
+  })
+  .catch(function (error) {
+    console.log("Unable to parse booked appointments!")
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
 });
+
+
+app.post('/booked', function (req, res) {
+  // Post to UI helper
+  axios.delete(UI_HELPER_API + '/cancel_appoitment', {
+    data : {
+      appointment_id : req.body.appointmentId,
+      doctor_id: req.body.cancelledById
+    }
+  })
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
+});
+
+
+app.post('/televisit', function (req, res) {
+  // Post to UI helper
+  axios.get(UI_HELPER_API + '/get_session', {
+    data : {
+      appoitment_id : req.body.appointmentId,
+    }
+  })
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
+});
+
+app.get('/appointment', function(req, res) {
+  // Post to UI helper
+  axios.get(UI_HELPER_API + '/get_appoitment', {
+    data : {
+      id : req.body.appointmentId,
+    }
+  })
+  .then(function (response) {
+    res.json(response.data);
+  })
+  .catch(function (error) {
+    console.log("Error calling UI Helper!");
+    console.log(error);
+    res.status(500).send('Error calling API!');
+  })
+});
+
 
 // ------------                               ------------
+
+
+
+// ~~~~~~~~~~~~ TODO - REMOVE LATER ~~~~~~~~~~~~
+
+// ~~~~~~~~~~~~                     ~~~~~~~~~~~~
 
 
 // CATCH ALL ROUTE
@@ -557,4 +338,36 @@ app.get('*', function(req, res) {
 
 app.listen(port, () => {
   console.log(`Example app listening on port:${port}`);
-})
+});
+
+
+// Helper Method: Format Date Time (YYYY-DD-MM)
+function FormatDate(dateTimeObject) {
+  // Add 0's in front of single digits
+  let month = (dateTimeObject.getUTCMonth() + 1);
+  if (month < 10) {
+    month = "0" + month;
+  }
+  let day = dateTimeObject.getUTCDate();
+  if (day < 10) {
+    day = "0" + day;
+  }
+  // Format as YYYY-DD-MMTHH:mm
+  let date = dateTimeObject.getUTCFullYear() + "-" + month + "-" + day;
+  return date;
+}
+
+// Helper Method: Format  Time (HH:mm)
+function FormatTime(dateTimeObject) {
+  let minutes = dateTimeObject.getUTCMinutes();
+  if (minutes < 10) {
+    minutes = "0" + minutes;
+  }
+  let hours = dateTimeObject.getUTCHours();
+  if (hours < 10) {
+    hours = "0" + hours;
+  }
+  // Format as HH:mm
+  let time = hours + ":" + minutes;
+  return time;
+}
