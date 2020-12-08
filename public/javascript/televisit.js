@@ -14,10 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Call UI Helper API to get Tokens
   $.ajax({
-    type: "POST",
-    url: INTERNAL_API + "/televisit",
+    type: "GET",
+    url: INTERNAL_API + "/session",
     data: {
-      "doctorId" : queries.doctorId,
       "appointmentId" : queries.appointmentId
     },
     success: function (res) {
@@ -67,12 +66,17 @@ document.addEventListener('DOMContentLoaded', function() {
     success: function (res1) {
       $.ajax({
         type: "GET",
-        url: INTERNAL_API + "/patientName",
+        url: INTERNAL_API + "/patientInfo",
         data: {
-          "appointmentId" : queries.appointmentId
+          "patientId" : res1.patient_id
         },
         success: function (res2) {
-          $("#patientInfo-Name").val(res2.patientName);
+          console.log(res2)
+          var patientName = res2.patient_first_name + " " + res2.patient_last_name;
+          $("#patientInfo-Name").val(patientName);
+          $("#patientInfo-Sex").val(res2.patient_sex);
+          $("#patientInfo-Birthday").val(res2.patient_dob);
+          $("#patientInfo-Insurance").val(res2.patient_insurance_id);
         },
         error: function(err) {
           console.log(err);
@@ -98,41 +102,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
   // Submit CPT Codes for Billing
-  $("#BillingCode-Submit").removeClass("btn-primary")
-  $("#BillingCode-Submit").addClass("btn-secondary");
   $("#BillingCode-Submit").on('click', function() {
-    //  TODO - AJAX Call, if supported by Group 3 in future
-    alert("Functionality currently not supported. \n" +
-          "Please contact Billing Management to update CPT codes.");
-    return false;
-  })
+    // Get Codes
+    var listOfCodes = $("#BillingCode-List").val();
 
-  // Submit Consultation Summary
-  $("#ConsultationSummary-Submit").on('click', function() {
-    // Get appointmentId & text field
-    var appointmentId = queries.appointmentId;
-    var consultationSummary = $("#ConsultationSummary-Notes").val();
-    // AJAX Call to Submit
+    if (listOfCodes.length == 0) {
+      alert("Please add a list of billing codes!");
+      return false;
+    }
+
+    // Submit to API
     $.ajax({
-      type: "POST",
-      url: UI_HELPER_API + "/consultation-summary",
-      data: {
-        "appointmentId" : appointmentId,
-        "consultationSummary" : consultationSummary
-      },
-      success: function (res) {
-        alert("Success. Consultation Summary Uploaded.");
-        // Update CSS for button
-        $("#ConsultationSummary-Submit").removeClass("btn-primary")
-        $("#ConsultationSummary-Submit").addClass("btn-secondary");
-      },
-      error: function (err) {
-        console.log(err);
-        alert("Error. Unable to submit Consultation Summary!");
-      }
-    });
+       type:"POST",
+       url: INTERNAL_API + "/billing-codes",
+       data:{
+        "appointmentId" : queries.appointmentId,
+        "billingCodes": listOfCodes
+       },
+       success: function(res) {
+         alert("Billing Codes have been submitted.");
+         // Update colors to user
+         $("#BillingCode-Submit").removeClass("btn-primary");
+         $("#BillingCode-Submit").addClass("btn-secondary");
+       },
+       error: function(error) {
+         console.log(error);
+         alert("Error. Unable to submit billing codes!");
+       }
+     });
     return false;
   });
+
 
   // Submit Chart Notes
   $("#ChartNotes-Submit").on('click', function() {
@@ -150,10 +150,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // AJAX Call to Submit
     var formdata = new FormData();
-    formdata.append("chart-notes", file);
+    formdata.append("file", file);
+    formdata.append("files_count", 1); // only 1 file
+
+    console.log(formdata.get("file"))
+
     $.ajax({
       type: "POST",
-      url: UI_HELPER_API + "/chart-notes?appointmentId="+appointmentId,
+      url: INTERNAL_API + "/chart-notes?appointmentId="+appointmentId,
       data: {
         formdata
       },
@@ -164,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update CSS for button
         $("#ChartNotes-Submit").removeClass("btn-primary")
         $("#ChartNotes-Submit").addClass("btn-secondary");
+        console.log(res)
       },
       error: function (err) {
         console.log(err);
@@ -173,6 +178,94 @@ document.addEventListener('DOMContentLoaded', function() {
     return false;
   });
 
+  // Submit Consultation Summary
+  $("#ConsultationSummary-Submit").on('click', function() {
+    // Get appointmentId & text field
+    var appointmentId = queries.appointmentId;
+    var consultationSummary = $("#ConsultationSummary-File").val();
+
+    var file = $("#ConsultationSummary-File").prop('files')[0];
+
+    // AJAX Call to Submit
+    var formdata = new FormData();
+    formdata.append("file", file);
+    formdata.append("files_count", 1); // only 1 file
+    $.ajax({
+      type: "POST",
+      url: INTERNAL_API + "/consultation-summary?appointmentId=" + appointmentId,
+      data: {
+        formdata
+      },
+      processData: false,
+      contentType: false,
+      success: function (res) {
+        alert("Success. Consultation Summary Uploaded.");
+        // Update CSS for button
+        $("#ConsultationSummary-Submit").removeClass("btn-primary")
+        $("#ConsultationSummary-Submit").addClass("btn-secondary");
+        console.log(res)
+      },
+      error: function (err) {
+        console.log(err);
+        alert("Error. Unable to submit Consultation Summary!");
+      }
+    });
+    return false;
+
+
+
+
+    // todo remove...........................
+  //   // AJAX Call to Submit
+  //   $.ajax({
+  //     type: "POST",
+  //     url: UI_HELPER_API + "/consultation-summary",
+  //     data: {
+  //       "appointmentId" : appointmentId,
+  //       "consultationSummary" : consultationSummary
+  //     },
+  //     success: function (res) {
+  //       alert("Success. Consultation Summary Uploaded.");
+  //       // Update CSS for button
+  //       $("#ConsultationSummary-Submit").removeClass("btn-primary")
+  //       $("#ConsultationSummary-Submit").addClass("btn-secondary");
+  //     },
+  //     error: function (err) {
+  //       console.log(err);
+  //       alert("Error. Unable to submit Consultation Summary!");
+  //     }
+  //   });
+  //   return false;
+  // });
+
+
+  // OLD CODE FOR CONSULATION SUMMARY THAT WAS TEXT BASED, NOT A FILE
+  // // Submit Consultation Summary
+  // $("#ConsultationSummary-Submit").on('click', function() {
+  //   // Get appointmentId & text field
+  //   var appointmentId = queries.appointmentId;
+  //   var consultationSummary = $("#ConsultationSummary-Notes").val();
+  //   // AJAX Call to Submit
+  //   $.ajax({
+  //     type: "POST",
+  //     url: UI_HELPER_API + "/consultation-summary",
+  //     data: {
+  //       "appointmentId" : appointmentId,
+  //       "consultationSummary" : consultationSummary
+  //     },
+  //     success: function (res) {
+  //       alert("Success. Consultation Summary Uploaded.");
+  //       // Update CSS for button
+  //       $("#ConsultationSummary-Submit").removeClass("btn-primary")
+  //       $("#ConsultationSummary-Submit").addClass("btn-secondary");
+  //     },
+  //     error: function (err) {
+  //       console.log(err);
+  //       alert("Error. Unable to submit Consultation Summary!");
+  //     }
+  //   });
+  //   return false;
+  });
 
 
 });

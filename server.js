@@ -11,6 +11,8 @@ const port = process.env.PORT || 3000; // Select either local port or Heroku def
 
 // UI Helper API Endpoint & Constants
 const UI_HELPER_API = "https://ui-helper.herokuapp.com";
+const TELE_SERVICE_API = "https://televisit-service.herokuapp.com";
+const APPT_SERVICE_API = "https://sdpm-appointment-service.herokuapp.com";
 const CANCELLED_APT_CODE = 3;
 
 
@@ -71,7 +73,7 @@ app.get('/doctorname', function(req, res) {
 });
 
 // API endpoint to get Doctor Name
-app.get('/patientname', function(req, res) {
+app.get('/patientInfo', function(req, res) {
 
   let patientId = req.query.patientId;
   let patientName = "Undefined";
@@ -83,9 +85,11 @@ app.get('/patientname', function(req, res) {
   })
   .then(function (response) {
     patientName = response.data.patient_first_name + " " + response.data.patient_last_name;
+    res.json(response.data)
   })
-  .then(function () {
-    res.json({patientName: patientName})
+  .then(function (error) {
+    console.log(error);
+    res.status(500).send(error);
   });
 
 });
@@ -123,7 +127,6 @@ app.get('/unbooked', function(req, res) {
     }
   })
   .catch(function (error) {
-    console.log("Unable to parse booked appointments!")
     console.log(error);
     // res.status(500).send('Error calling API!');
   })
@@ -166,7 +169,6 @@ app.get('/unbooked', function(req, res) {
       }
     })
     .catch(function (error) {
-      console.log("Unable to parse booked appointments!")
       console.log(error);
       res.status(500).send('Error calling API!');
     })
@@ -180,18 +182,18 @@ app.get('/unbooked', function(req, res) {
 
 
 // ------------ Proxy Endpoints for CORS issues ------------
-app.get("/doctors", function(req, res) {
-  // Query UI helper
-  axios.get(UI_HELPER_API + '/all_doctors', {})
-  .then(function (response) {
-    res.json(response.data);
-  })
-  .catch(function (error) {
-    console.log("Error calling UI Helper!");
-    console.log(error);
-    res.status(500).send('Error calling API!');
-  })
-});
+  app.get("/doctors", function(req, res) {
+    // Query UI helper
+    axios.get(UI_HELPER_API + '/all_doctors', {})
+    .then(function (response) {
+      res.json(response.data);
+    })
+    .catch(function (error) {
+      console.log("Error calling UI Helper!");
+      console.log(error);
+      res.status(500).send('Error calling API!');
+    })
+  });
 
 app.get("/patients", function(req, res) {
   // Query UI helper
@@ -287,13 +289,9 @@ app.post('/booked', function (req, res) {
 });
 
 
-app.post('/televisit', function (req, res) {
+app.get('/session', function (req, res) {
   // Post to UI helper
-  axios.get(UI_HELPER_API + '/get_session', {
-    data : {
-      appoitment_id : req.body.appointmentId,
-    }
-  })
+  axios.get(TELE_SERVICE_API + '/televisit/' + req.query.appointmentId, {})
   .then(function (response) {
     res.json(response.data);
   })
@@ -307,8 +305,8 @@ app.post('/televisit', function (req, res) {
 app.get('/appointment', function(req, res) {
   // Post to UI helper
   axios.get(UI_HELPER_API + '/get_appoitment', {
-    data : {
-      id : req.body.appointmentId,
+    params : {
+      id : req.query.appointmentId,
     }
   })
   .then(function (response) {
@@ -321,14 +319,61 @@ app.get('/appointment', function(req, res) {
   })
 });
 
+app.post('/chart-notes', function (req, res) {
+  console.log("HIT IT HERE")
+  console.log(req.form)
+  // Post to UI helper
+  axios.post(APPT_SERVICE_API + '/appointment/' + req.query.appointmentId + "/charts", {
+    "form-data" :  req.body.formData
+  })
+  .then(function (response) {
+    // console.log(response)
+    res.json(response.data);
+  })
+  .catch( function (error) {
+    console.log("Error calling API Service!");
+    console.log(error);
+    res.status(500).send(error);
+  })
+});
+
+
+app.post('/consultation-summary', function (req, res) {
+  // Post to UI helper
+  axios.post(APPT_SERVICE_API + '/appointment/' + req.query.appointmentId + "/consultation_summary", {
+    "form-data" :  req.body.formData
+  })
+  .then(function (response) {
+    console.log(response)
+    res.json(response.data);
+  })
+  .catch( function (error) {
+    console.log("Error calling API Service!");
+    console.log(error);
+    res.status(500).send(error);
+  })
+});
+
+
+app.post('/billing-codes', function (req, res) {
+  // Post to UI helper
+  axios.post(UI_HELPER_API + "/post_billing_codes", {
+    id : req.body.appointmentId,
+    billing_codes: req.body.billingCodes
+  })
+  .then(function (response) {
+    console.log(response)
+    res.json(response.data);
+  })
+  .catch( function (error) {
+    console.log("Error calling API Service!");
+    console.log(error);
+    res.status(500).send(error);
+  })
+})
+
 
 // ------------                               ------------
-
-
-
-// ~~~~~~~~~~~~ TODO - REMOVE LATER ~~~~~~~~~~~~
-
-// ~~~~~~~~~~~~                     ~~~~~~~~~~~~
 
 
 // CATCH ALL ROUTE
