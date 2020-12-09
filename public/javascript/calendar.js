@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Get Data Elements
     var openId = $("#openAptModal-label-apt-id").val();
-    var isTeleVisit = $("#openAptModal-label-apt-type").val();
+    var isTeleVisit = $("#openAptModal-label-apt-type").val() == "true";
     var doctorId = GetDoctorId();
     var patientId = $("#openAptModal-label-patient-name").val();
     var patientName = $("#openAptModal-label-patient-name :selected")[0].text;
@@ -493,7 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Parse Start / End Date Times
     var startDateTime = FormatDateTime(new Date($("#openAptModal-label-date-start-time").val()));
     var endDateTime = FormatDateTime(new Date($("#openAptModal-label-date-end-time").val()));
-    console.log(startDateTime)
 
     // Call UI Helper API to book apt
     $.ajax({
