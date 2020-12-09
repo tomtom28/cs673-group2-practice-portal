@@ -16,37 +16,42 @@ describe('doctor televisit', function() {
 
   // As a Doctor hosting my TeleVisit Session ...
   before(function(done) {
-    this.browser.visit('/televisit?appointmentId=3&doctorId=1', done);
-  });
+    this.browser.visit('/televisit?appointmentId=55&doctorId=4', done);
+  })
 
-
-  // Upload Billing Codes:
-
-    // Happy Path:
-
-      // ... When I submit my billing codes using the (blue) submit button ...
-      it('should have a blue submit button for Billing Codes', function() {
-        assert.ok(this.browser.success);
-        browser.fill('#BillingCode-List', "F01, F02, F03");
-        browser.document.forms[1].submit();
-
-      })
-
-
-
-      // ... I will know the submission was successful if the button turns grey
-
+  // ... I will Upload Billing Codes ...
 
     // Sad Path:
+      // ... I will see a (blue) submit button for Billing Codes ...
+      it('should have a blue submit button for Billing Codes', function() {
+        assert.ok(this.browser.success);
+        browser.assert.className('#BillingCode-Submit', 'btn-primary');
+      })
+      // ... And I will add my billing codes to the form & submit ...
+      it('should alert me of an invalid input', function() {
+        // ... If I accidently submit no billing codes ...
+        browser.pressButton('#BillingCode-Submit').then(function() {
+          // ... I will be alerted to double check my inputs ...
+          assert.equal(browser.Window.alert.text(), 'Please add a list of billing codes!')
+          // ... And the button will remain unchanged.
+          browser.assert.className('#BillingCode-Submit', 'btn-primary');
+        })
+      })
 
-      // ... If I accidently submit no billing codes ...
-
-
-      // ... I will be alerted to double check my inputs
-
-
-
-
+    // Happy Path:
+      // ... I will see a (blue) submit button for Billing Codes ...
+      it('should have a blue submit button for Billing Codes', function() {
+        assert.ok(this.browser.success);
+        browser.assert.className('#BillingCode-Submit', 'btn-primary');
+      })
+      // ... And I will add my billing codes to the form & submit ...
+      it('should allow me to submit billing codes', function() {
+        browser.fill('#BillingCode-List', "F01, F02, F03");
+        // ... When I submit my billing codes, I will know the submission was successful if the button turns grey.
+        browser.pressButton('#BillingCode-Submit').then(function() {
+          browser.assert.className('#BillingCode-Submit', 'btn-secondary');
+        })
+      })
 
   // Shutdown the server once complete
   after(function(done) {
