@@ -2,6 +2,11 @@
 const express = require('express');
 const bodyParser = require("body-parser");
 
+// File Uploads / Downloads
+const fs = require("fs");
+const FormData = require('form-data');
+const fileUpload = require("express-fileupload");
+
 // For External API Calls
 const axios = require('axios').default;
 
@@ -19,6 +24,11 @@ const CANCELLED_APT_CODE = 3;
 // Use Body Parser
 app.use(bodyParser.urlencoded({
     extended: true
+}));
+
+// Use File Uploader
+app.use(fileUpload({
+  limits: { fileSize: 50 * 1024 * 1024 },
 }));
 
 
@@ -58,13 +68,17 @@ app.get('/doctorname', function(req, res) {
     params: {}
   })
   .then(function (response) {
-    let doctorList = response.data;
+    console.log(response.data)
+    let doctorList = response.data.doctor;
     for (let i=0; i<doctorList.length; i++) {
-      if (doctorList[i].id == doctorId) {
-        doctorName = doctorList[i].name;
+      if (doctorList[i].ID == doctorId) {
+        doctorName = doctorList[i].Name;
         break;
       }
     }
+  })
+  .then(function(err) {
+    console.log(err)
   })
   .then(function() {
     res.json({doctorName: doctorName})
@@ -73,7 +87,7 @@ app.get('/doctorname', function(req, res) {
 });
 
 // API endpoint to get Doctor Name
-app.get('/patientInfo', function(req, res) {
+app.get('/patient-info', function(req, res) {
 
   let patientId = req.query.patientId;
   let patientName = "Undefined";
@@ -186,7 +200,7 @@ app.get('/unbooked', function(req, res) {
     // Query UI helper
     axios.get(UI_HELPER_API + '/all_doctors', {})
     .then(function (response) {
-      res.json(response.data);
+      res.json(response.data.doctor);
     })
     .catch(function (error) {
       console.log("Error calling UI Helper!");
@@ -242,7 +256,6 @@ app.get('/booked', function(req, res) {
     for (let i=0; i<resData.length; i++) {
       // Only append non-cancelled appoitments
       if (resData[i].appointment_status != CANCELLED_APT_CODE) {
-
         // Parse for Dates / Times
         let startDateTime = new Date(resData[i].start_time);
         let endDateTime = new Date(resData[i].end_time);
@@ -255,7 +268,7 @@ app.get('/booked', function(req, res) {
           endTime: FormatTime(endDateTime),
           doctorId: resData[i].doctor_id,
           patientId: resData[i].patient_id,
-          isTeleVisit: true //resData[i].isTeleVisit // todo
+          isTeleVisit: resData[i].tele_visit
         };
         bookedSlots.push(bookedSlot);
       }
@@ -284,7 +297,7 @@ app.post('/booked', function (req, res) {
   .catch(function (error) {
     console.log("Error calling UI Helper!");
     console.log(error);
-    res.status(500).send('Error calling API!');
+    res.status(500).send(error);
   })
 });
 
@@ -319,29 +332,10 @@ app.get('/appointment', function(req, res) {
   })
 });
 
-app.post('/chart-notes', function (req, res) {
-  console.log("HIT IT HERE")
-  console.log(req.form)
-  // Post to UI helper
-  axios.post(APPT_SERVICE_API + '/appointment/' + req.query.appointmentId + "/charts", {
-    "form-data" :  req.body.formData
-  })
-  .then(function (response) {
-    // console.log(response)
-    res.json(response.data);
-  })
-  .catch( function (error) {
-    console.log("Error calling API Service!");
-    console.log(error);
-    res.status(500).send(error);
-  })
-});
-
-
 app.post('/consultation-summary', function (req, res) {
   // Post to UI helper
-  axios.post(APPT_SERVICE_API + '/appointment/' + req.query.appointmentId + "/consultation_summary", {
-    "form-data" :  req.body.formData
+  axios.post(APPT_SERVICE_API + '/appointment/' + req.body.appointmentId + "/upload_consultation_summary", {
+    summary : req.body.consultationSummary
   })
   .then(function (response) {
     console.log(response)
@@ -372,6 +366,35 @@ app.post('/billing-codes', function (req, res) {
   })
 })
 
+app.post('/chart-notes', function (req, res) {
+
+  // console.log(req.files.file1.data)
+  // console.log(req.query.appointmentId)
+
+  // Create Form Submission
+  let fileData = req.files.file1.data;
+  let form = new FormData();
+  // form.append("id", req.query.appointmentId);
+  form.append("files_count", 1);
+  form.append("file1", fileData);
+
+  axios.post(APPT_SERVICE_API + '/appointment/' + req.query.appointmentId + "/charts" , {
+    headers : {
+      'Content-Type': 'multipart/form-data'
+    },
+    form
+  })
+  .then(function (response) {
+    console.log(response)
+    res.json(response.data);
+  })
+  .catch( function (error) {
+    console.log("Error calling API Service!");
+    console.log(error);
+    res.status(500).send(error);
+  })
+
+});
 
 // ------------                               ------------
 

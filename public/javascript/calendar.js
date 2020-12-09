@@ -1,6 +1,5 @@
 var counterStart = 1000000000000; // sets an very large number for open slot id's to avoid collisions with real apt ids
 var counterMax = counterStart + 1; // tracks the maximum calendar counter value
-var TEST_TEMP;
 
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -105,6 +104,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Clicked Event, Triggers Modal
     eventClick: function(arg) {
 
+      console.log(arg.event.extendedProps)
+
       // Determine Type of Event
       var eventClassNames = arg.el.className;
 
@@ -180,13 +181,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Query for Patient Name
         $.ajax({
           type: "GET",
-          url: INTERNAL_API + "/patientname",
+          url: INTERNAL_API + "/patient-info",
           data: {
             "patientId" : patientId
           },
           success: function(res) {
             // Append Patient Name to DOM
-            patientName = res.patientName;
+            patientName = res.patient_first_name + " " + res.patient_last_name;
           },
           error: function(err) {
             console.log(err);
@@ -271,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
       success: function(res) {
         // Iterate over response and append to DOM
         for (var i=0; i < res.length; i++) {
-          $("#select-doctor").append('<option value="' + res[i].id + '">' + res[i].name + '</option>');
+          $("#select-doctor").append('<option value="' + res[i].ID + '">' + res[i].Name + '</option>');
         }
         // Render Calendar
         calendar.render();
@@ -424,7 +425,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Get Data Elements
     var appointmentId = $("#bookedAptModal-label-apt-id").val();
-    var cancelledById = userId; // from login session
+
+    // DoctorId is used if Receptionist is logged in
+    var cancelledById = GetDoctorId();
 
     // Call UI Helper API to remove apt
     $.ajax({
@@ -521,7 +524,7 @@ document.addEventListener('DOMContentLoaded', function() {
            extendedProps: {
              patientId: patientId,
              doctorId: doctorId,
-             appointmentType: (isTeleVisit) ? "Tele-Visit" : "In-Person"
+             appointmentType: isTeleVisit == "true"
            }
          }
          calendar.addEvent(_updatedEvent);

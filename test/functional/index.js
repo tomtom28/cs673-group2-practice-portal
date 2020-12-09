@@ -21,12 +21,12 @@ describe('home page', function() {
 
   // Tests are below...
 
-  it('should should be labeled as the practice portal', function() {
+  it('should be labeled as the practice portal', function() {
     assert.ok(this.browser.success);
     assert.equal(this.browser.text('h1'), 'Practice Portal');
   });
 
-  it('should should allow the user to toggle between Doctor or Receptionist Views', function() {
+  it('should allow the user to toggle between Doctor or Receptionist Views', function() {
     assert.ok(this.browser.success);
     assert.equal(this.browser.text('a.btn-primary'), 'Receptionist View');
     assert.equal(this.browser.text('a.btn-secondary'), 'Doctor View');
