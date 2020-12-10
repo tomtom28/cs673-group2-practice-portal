@@ -2,7 +2,10 @@
 This is the "Practice Portal" micro-service used for Appointment Scheduling and Tele-Visits for
 employees of a medical practice (i.e. Doctors or Receptionists).
 
-The project implements the GUI and proxy server for the front-end focus application (by Thomas Thompson).
+The project implements the GUI and proxy server for the front-end application (by Thomas Thompson).
+
+The code is deployed on Heroku at the following location:
+https://group2-practice-portal.herokuapp.com/
 
 
 #### External Dependencies
