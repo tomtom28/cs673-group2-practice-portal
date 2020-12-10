@@ -4,6 +4,9 @@ var app = require('../../server');
 var http = require('http');
 var assert = require('assert');
 
+// Reference:
+// https://www.redotheweb.com/2013/01/15/functional-testing-for-nodejs-using-mocha-and-zombie-js.html
+
 // use zombie.js as headless browser
 var Browser = require('zombie');
 
